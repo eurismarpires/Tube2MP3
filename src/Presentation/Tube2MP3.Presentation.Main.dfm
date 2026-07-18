@@ -127,13 +127,31 @@
     end
     object lblHistory: TLabel
       Left = 20
-      Top = 454
+      Top = 538
       Width = 58
       Height = 21
       Caption = 'Histórico'
       Font.Height = -16
       Font.Style = [fsBold]
       ParentFont = False
+    end
+    object lblPlaybackCaption: TLabel
+      Left = 20
+      Top = 454
+      Width = 76
+      Height = 17
+      Caption = 'Reproducao'
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+    object lblPlayback: TLabel
+      Left = 20
+      Top = 478
+      Width = 500
+      Height = 17
+      AutoSize = False
+      Caption = 'Nenhum arquivo selecionado'
+      EllipsisPosition = epEndEllipsis
     end
     object edtUrl: TEdit
       Left = 20
@@ -222,9 +240,9 @@
     end
     object lvHistory: TListView
       Left = 20
-      Top = 481
+      Top = 565
       Width = 910
-      Height = 198
+      Height = 114
       Anchors = [akLeft, akTop, akRight, akBottom]
       Columns = <
         item
@@ -252,6 +270,42 @@
       TabOrder = 10
       ViewStyle = vsReport
       OnDblClick = lvHistoryDblClick
+      OnSelectItem = lvHistorySelectItem
+    end
+    object btnPlay: TButton
+      Left = 540
+      Top = 474
+      Width = 90
+      Height = 29
+      Caption = 'Tocar'
+      TabOrder = 10
+      OnClick = btnPlayClick
+    end
+    object btnPause: TButton
+      Left = 638
+      Top = 474
+      Width = 90
+      Height = 29
+      Caption = 'Pausar'
+      TabOrder = 11
+      OnClick = btnPauseClick
+    end
+    object btnStop: TButton
+      Left = 736
+      Top = 474
+      Width = 90
+      Height = 29
+      Caption = 'Parar'
+      TabOrder = 12
+      OnClick = btnStopClick
+    end
+    object mediaPlayer: TMediaPlayer
+      Left = 842
+      Top = 474
+      Width = 85
+      Height = 29
+      VisibleButtons = []
+      Visible = False
     end
   end
 end

@@ -7,7 +7,7 @@ uses
   System.SysUtils, System.Classes, System.IOUtils, System.Threading, System.UITypes,
   System.Net.HttpClient, System.Generics.Collections,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
-  Vcl.ExtCtrls, Vcl.ComCtrls, Vcl.Clipbrd,
+  Vcl.ExtCtrls, Vcl.ComCtrls, Vcl.Clipbrd, Vcl.MPlayer,
   Tube2MP3.Domain.Models, Tube2MP3.Infrastructure.Logger,
   Tube2MP3.Infrastructure.Settings, Tube2MP3.Infrastructure.History,
   Tube2MP3.Infrastructure.YtDlp;
@@ -39,6 +39,12 @@ type
     lblHistory: TLabel;
     lvHistory: TListView;
     btnOpenFolder: TButton;
+    lblPlaybackCaption: TLabel;
+    lblPlayback: TLabel;
+    btnPlay: TButton;
+    btnPause: TButton;
+    btnStop: TButton;
+    mediaPlayer: TMediaPlayer;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure btnPasteClick(Sender: TObject);
@@ -48,6 +54,11 @@ type
     procedure btnCancelClick(Sender: TObject);
     procedure btnOpenFolderClick(Sender: TObject);
     procedure lvHistoryDblClick(Sender: TObject);
+    procedure btnPlayClick(Sender: TObject);
+    procedure btnPauseClick(Sender: TObject);
+    procedure btnStopClick(Sender: TObject);
+    procedure lvHistorySelectItem(Sender: TObject; Item: TListItem;
+      Selected: Boolean);
   private
     FBasePath: string;
     FLogger: TFileLogger;
@@ -56,6 +67,7 @@ type
     FYtDlp: TYtDlpService;
     FWorker: TThread;
     FVideo: TVideoInfo;
+    FPlaybackFile: string;
     procedure SetBusy(ABusy: Boolean; const AStatus: string);
     procedure LoadHistory;
     procedure LoadThumbnail(const AUrl: string);
@@ -63,6 +75,9 @@ type
     function SelectedBitrate: Integer;
     function GetLocalFileSize(const AFileName: string): Int64;
     function FindProjectBase: string;
+    procedure SetPlaybackFile(const AFilePath: string);
+    procedure UpdatePlaybackControls;
+    procedure StopPlayback;
   public
   end;
 
@@ -107,6 +122,7 @@ begin
         mtWarning, [mbOK], 0);
     end;
   end;
+  UpdatePlaybackControls;
   SetBusy(False, 'Pronto');
 end;
 
@@ -141,6 +157,7 @@ end;
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   StopWorker;
+  StopPlayback;
   if Assigned(FSettings) then
   begin
     FSettings.DownloadFolder := edtFolder.Text;
@@ -155,6 +172,48 @@ begin
   FYtDlp.Free;
   FSettings.Free;
   FLogger.Free;
+end;
+
+procedure TMainForm.UpdatePlaybackControls;
+var
+  HasPlaybackFile: Boolean;
+begin
+  HasPlaybackFile := FileExists(FPlaybackFile);
+  btnPlay.Enabled := HasPlaybackFile and (mediaPlayer.Mode <> mpPlaying);
+  btnPause.Enabled := HasPlaybackFile and
+    (mediaPlayer.Mode in [mpPlaying, mpPaused]);
+  btnStop.Enabled := HasPlaybackFile and
+    (mediaPlayer.Mode in [mpPlaying, mpPaused, mpStopped]);
+  if mediaPlayer.Mode = mpPaused then
+    btnPause.Caption := 'Continuar'
+  else
+    btnPause.Caption := 'Pausar';
+end;
+
+procedure TMainForm.StopPlayback;
+begin
+  try
+    if mediaPlayer.Mode in [mpPlaying, mpPaused] then
+      mediaPlayer.Stop;
+    if mediaPlayer.FileName <> '' then
+      mediaPlayer.Close;
+  except
+    on E: Exception do FLogger.Error('Reproducao: ' + E.Message);
+  end;
+  UpdatePlaybackControls;
+end;
+
+procedure TMainForm.SetPlaybackFile(const AFilePath: string);
+begin
+  StopPlayback;
+  FPlaybackFile := AFilePath;
+  if FileExists(FPlaybackFile) then
+    lblPlayback.Caption := ExtractFileName(FPlaybackFile)
+  else if FPlaybackFile <> '' then
+    lblPlayback.Caption := 'Arquivo nao encontrado'
+  else
+    lblPlayback.Caption := 'Nenhum arquivo selecionado';
+  UpdatePlaybackControls;
 end;
 
 procedure TMainForm.SetBusy(ABusy: Boolean; const AStatus: string);
@@ -349,6 +408,7 @@ begin
             progressBar.Position := 100;
             SetBusy(False, 'Download concluído');
             LoadHistory;
+            SetPlaybackFile(FilePath);
           end);
       except
         on E: EAbort do
@@ -424,6 +484,62 @@ begin
   if FileExists(Path) then
     ShellExecute(Handle, 'open', PChar('/select,"' + Path + '"'), nil, nil,
       SW_SHOWNORMAL);
+end;
+
+procedure TMainForm.lvHistorySelectItem(Sender: TObject; Item: TListItem;
+  Selected: Boolean);
+var
+  Path: string;
+begin
+  if (not Selected) or (Item.SubItems.Count < 4) then Exit;
+  Path := Item.SubItems[3];
+  SetPlaybackFile(Path);
+end;
+
+procedure TMainForm.btnPlayClick(Sender: TObject);
+begin
+  if not FileExists(FPlaybackFile) then
+  begin
+    MessageDlg('Selecione um arquivo MP3 existente para tocar.', mtWarning,
+      [mbOK], 0);
+    UpdatePlaybackControls;
+    Exit;
+  end;
+  try
+    if mediaPlayer.FileName <> FPlaybackFile then
+    begin
+      if mediaPlayer.FileName <> '' then mediaPlayer.Close;
+      mediaPlayer.FileName := FPlaybackFile;
+      mediaPlayer.Open;
+    end;
+    mediaPlayer.Play;
+  except
+    on E: Exception do
+    begin
+      FLogger.Error('Reproducao: ' + E.Message);
+      MessageDlg('Nao foi possivel tocar o arquivo selecionado.', mtError,
+        [mbOK], 0);
+    end;
+  end;
+  UpdatePlaybackControls;
+end;
+
+procedure TMainForm.btnPauseClick(Sender: TObject);
+begin
+  try
+    if mediaPlayer.Mode = mpPlaying then
+      mediaPlayer.Pause
+    else if mediaPlayer.Mode = mpPaused then
+      mediaPlayer.Play;
+  except
+    on E: Exception do FLogger.Error('Reproducao: ' + E.Message);
+  end;
+  UpdatePlaybackControls;
+end;
+
+procedure TMainForm.btnStopClick(Sender: TObject);
+begin
+  StopPlayback;
 end;
 
 end.

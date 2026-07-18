@@ -42,4 +42,25 @@ foreach ($file in $sourceFiles) {
     }
 }
 
+$mainFormPath = Join-Path $PSScriptRoot '..\src\Presentation\Tube2MP3.Presentation.Main.pas'
+$mainFormText = Get-Content -Raw $mainFormPath
+$requiredPlaybackMembers = @(
+    'Vcl.MPlayer',
+    'mediaPlayer: TMediaPlayer',
+    'btnPlay: TButton',
+    'btnPause: TButton',
+    'btnStop: TButton',
+    'procedure btnPlayClick(Sender: TObject)',
+    'procedure btnPauseClick(Sender: TObject)',
+    'procedure btnStopClick(Sender: TObject)',
+    'procedure lvHistorySelectItem(Sender: TObject; Item: TListItem;',
+    'SetPlaybackFile(FilePath)',
+    'SetPlaybackFile(Path)'
+)
+foreach ($member in $requiredPlaybackMembers) {
+    if ($mainFormText -notlike "*$member*") {
+        throw "Player MP3 incompleto: declaracao ausente '$member'."
+    }
+}
+
 Write-Host 'PROJECT VALIDATION PASSED'
