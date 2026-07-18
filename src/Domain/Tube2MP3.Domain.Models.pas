@@ -32,6 +32,7 @@ type
     Quality: Integer;
     Size: Int64;
     FilePath: string;
+    ThumbnailPath: string;
     Status: string;
     CreatedAt: TDateTime;
   end;

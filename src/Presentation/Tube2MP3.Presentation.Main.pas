@@ -71,6 +71,10 @@ type
     procedure SetBusy(ABusy: Boolean; const AStatus: string);
     procedure LoadHistory;
     procedure LoadThumbnail(const AUrl: string);
+    procedure LoadThumbnailFromFile(const AFileName: string);
+    procedure LoadHistoryThumbnail(const AAudioPath, AUrl: string);
+    procedure SaveThumbnail(const AUrl, AAudioPath: string);
+    function ThumbnailCachePath(const AAudioPath: string): string;
     procedure StopWorker;
     function SelectedBitrate: Integer;
     function GetLocalFileSize(const AFileName: string): Int64;
@@ -344,6 +348,78 @@ begin
     end);
 end;
 
+function TMainForm.ThumbnailCachePath(const AAudioPath: string): string;
+begin
+  Result := TPath.Combine(FBasePath, 'data\thumbnails\' +
+    ChangeFileExt(ExtractFileName(AAudioPath), '.jpg'));
+end;
+
+procedure TMainForm.LoadThumbnailFromFile(const AFileName: string);
+begin
+  if not FileExists(AFileName) then Exit;
+  try
+    imgThumbnail.Picture.LoadFromFile(AFileName);
+  except
+    on E: Exception do FLogger.Error('Thumbnail local: ' + E.Message);
+  end;
+end;
+
+procedure TMainForm.SaveThumbnail(const AUrl, AAudioPath: string);
+begin
+  if AUrl = '' then Exit;
+  TTask.Run(
+    procedure
+    var
+      Client: THTTPClient;
+      Stream: TMemoryStream;
+      CachePath: string;
+    begin
+      Client := THTTPClient.Create;
+      Stream := TMemoryStream.Create;
+      try
+        Client.Get(AUrl, Stream);
+        CachePath := ThumbnailCachePath(AAudioPath);
+        ForceDirectories(ExtractFileDir(CachePath));
+        Stream.SaveToFile(CachePath);
+        TThread.Queue(nil,
+          procedure
+          begin
+            if SameText(FPlaybackFile, ResolveExistingAudioFile(AAudioPath)) then
+              LoadThumbnailFromFile(CachePath);
+          end);
+      except
+        on E: Exception do FLogger.Error('Cache de thumbnail: ' + E.Message);
+      end;
+      Stream.Free;
+      Client.Free;
+    end);
+end;
+
+procedure TMainForm.LoadHistoryThumbnail(const AAudioPath, AUrl: string);
+var
+  CachePath: string;
+begin
+  imgThumbnail.Picture.Assign(nil);
+  CachePath := ThumbnailCachePath(AAudioPath);
+  if FileExists(CachePath) then
+  begin
+    LoadThumbnailFromFile(CachePath);
+    Exit;
+  end;
+  TTask.Run(
+    procedure
+    var
+      Info: TVideoInfo;
+    begin
+      try
+        Info := FYtDlp.GetVideoInfo(AUrl);
+        SaveThumbnail(Info.ThumbnailUrl, AAudioPath);
+      except
+        on E: Exception do FLogger.Error('Thumbnail do historico: ' + E.Message);
+      end;
+    end);
+end;
+
 procedure TMainForm.btnFolderClick(Sender: TObject);
 var
   Folder: string;
@@ -409,6 +485,7 @@ begin
             SetBusy(False, 'Download concluído');
             LoadHistory;
             SetPlaybackFile(FilePath);
+            SaveThumbnail(Video.ThumbnailUrl, FilePath);
           end);
       except
         on E: EAbort do
@@ -462,6 +539,7 @@ begin
       L.SubItems.Add(FormatDateTime('dd/mm/yyyy hh:nn', H.CreatedAt));
       L.SubItems.Add(H.Status);
       L.SubItems.Add(H.FilePath);
+      L.SubItems.Add(H.Url);
     end;
   finally
     lvHistory.Items.EndUpdate;
@@ -494,6 +572,8 @@ begin
   if (not Selected) or (Item.SubItems.Count < 4) then Exit;
   Path := Item.SubItems[3];
   SetPlaybackFile(Path);
+  if Item.SubItems.Count > 4 then
+    LoadHistoryThumbnail(Path, Item.SubItems[4]);
 end;
 
 procedure TMainForm.btnPlayClick(Sender: TObject);

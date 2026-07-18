@@ -3,9 +3,10 @@
 {$APPTYPE CONSOLE}
 
 uses
-  System.SysUtils, System.IOUtils,
+  System.SysUtils, System.IOUtils, System.Generics.Collections,
   Tube2MP3.Application.Helpers in 'src\Application\Tube2MP3.Application.Helpers.pas',
-  Tube2MP3.Domain.Models in 'src\Domain\Tube2MP3.Domain.Models.pas';
+  Tube2MP3.Domain.Models in 'src\Domain\Tube2MP3.Domain.Models.pas',
+  Tube2MP3.Infrastructure.History in 'src\Infrastructure\Tube2MP3.Infrastructure.History.pas';
 
 procedure Check(ACondition: Boolean; const AMessage: string);
 begin
@@ -16,7 +17,10 @@ end;
 procedure Run;
 var
   P: TDownloadProgress;
-  Folder, ActualPath, StoredPath: string;
+  Folder, ActualPath, StoredPath, DatabasePath: string;
+  History: THistoryRepository;
+  HistoryItem: THistoryItem;
+  HistoryItems: TList<THistoryItem>;
 begin
   Check(IsSupportedYouTubeUrl('https://www.youtube.com/watch?v=abc123'), 'youtube URL');
   Check(IsSupportedYouTubeUrl('https://youtu.be/abc123'), 'youtu.be URL');
@@ -43,6 +47,42 @@ begin
     TFile.WriteAllText(ActualPath, 'test');
     Check(ResolveExistingAudioFile(StoredPath) = ActualPath,
       'resolve historical audio path with replaced character');
+  finally
+    TDirectory.Delete(Folder, True);
+  end;
+  Folder := TPath.Combine(TPath.GetTempPath, 'Tube2MP3HistoryTests-' +
+    TGUID.NewGuid.ToString);
+  TDirectory.CreateDirectory(Folder);
+  try
+    DatabasePath := TPath.Combine(Folder, 'history.db');
+    History := THistoryRepository.Create(DatabasePath);
+    try
+      HistoryItem := Default(THistoryItem);
+      HistoryItem.Title := 'thumbnail test';
+      HistoryItem.Url := 'https://youtu.be/abc123';
+      HistoryItem.FilePath := 'C:\temp\audio.mp3';
+      HistoryItem.Status := 'Concluido';
+      HistoryItem.CreatedAt := Now;
+      HistoryItem.ThumbnailPath := 'C:\temp\thumbnail.jpg';
+      History.Add(HistoryItem);
+      HistoryItems := History.GetAll;
+      try
+        Check(HistoryItems[0].ThumbnailPath = HistoryItem.ThumbnailPath,
+          'persist thumbnail path');
+        History.UpdateThumbnailPath(HistoryItems[0].Id, 'C:\temp\updated.jpg');
+      finally
+        HistoryItems.Free;
+      end;
+      HistoryItems := History.GetAll;
+      try
+        Check(HistoryItems[0].ThumbnailPath = 'C:\temp\updated.jpg',
+          'update thumbnail path');
+      finally
+        HistoryItems.Free;
+      end;
+    finally
+      History.Free;
+    end;
   finally
     TDirectory.Delete(Folder, True);
   end;
