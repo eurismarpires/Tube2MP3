@@ -206,7 +206,7 @@ end;
 procedure TMainForm.SetPlaybackFile(const AFilePath: string);
 begin
   StopPlayback;
-  FPlaybackFile := AFilePath;
+  FPlaybackFile := ResolveExistingAudioFile(AFilePath);
   if FileExists(FPlaybackFile) then
     lblPlayback.Caption := ExtractFileName(FPlaybackFile)
   else if FPlaybackFile <> '' then

@@ -3,7 +3,7 @@
 interface
 
 uses
-  System.SysUtils,
+  System.SysUtils, System.IOUtils, System.Types,
   System.Net.URLClient,
   System.RegularExpressions,
   Tube2MP3.Domain.Models;
@@ -12,6 +12,7 @@ function IsSupportedYouTubeUrl(const AUrl: string): Boolean;
 function FormatDuration(ASeconds: Integer): string;
 function TryParseProgress(const ALine: string; out AProgress: TDownloadProgress): Boolean;
 function QuoteArg(const AValue: string): string;
+function ResolveExistingAudioFile(const AFilePath: string): string;
 
 implementation
 
@@ -72,6 +73,39 @@ end;
 function QuoteArg(const AValue: string): string;
 begin
   Result := '"' + StringReplace(AValue, '"', '\"', [rfReplaceAll]) + '"';
+end;
+
+function ResolveExistingAudioFile(const AFilePath: string): string;
+var
+  Folder, ExpectedName, Candidate: string;
+  Candidates: TStringDynArray;
+  I: Integer;
+  Matches: Boolean;
+begin
+  if FileExists(AFilePath) then
+    Exit(AFilePath);
+  Folder := ExtractFileDir(AFilePath);
+  ExpectedName := ExtractFileName(AFilePath);
+  if (ExpectedName = '') or (Pos('?', ExpectedName) = 0) or
+    not TDirectory.Exists(Folder) then
+    Exit('');
+  Candidates := TDirectory.GetFiles(Folder, '*.mp3');
+  for Candidate in Candidates do
+  begin
+    if Length(ExtractFileName(Candidate)) <> Length(ExpectedName) then
+      Continue;
+    Matches := True;
+    for I := 1 to Length(ExpectedName) do
+      if (ExpectedName[I] <> '?') and
+        not SameText(string(ExpectedName[I]), string(ExtractFileName(Candidate)[I])) then
+      begin
+        Matches := False;
+        Break;
+      end;
+    if Matches then
+      Exit(Candidate);
+  end;
+  Result := '';
 end;
 
 end.

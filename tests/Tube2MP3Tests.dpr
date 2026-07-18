@@ -3,7 +3,7 @@
 {$APPTYPE CONSOLE}
 
 uses
-  System.SysUtils,
+  System.SysUtils, System.IOUtils,
   Tube2MP3.Application.Helpers in 'src\Application\Tube2MP3.Application.Helpers.pas',
   Tube2MP3.Domain.Models in 'src\Domain\Tube2MP3.Domain.Models.pas';
 
@@ -16,6 +16,7 @@ end;
 procedure Run;
 var
   P: TDownloadProgress;
+  Folder, ActualPath, StoredPath: string;
 begin
   Check(IsSupportedYouTubeUrl('https://www.youtube.com/watch?v=abc123'), 'youtube URL');
   Check(IsSupportedYouTubeUrl('https://youtu.be/abc123'), 'youtu.be URL');
@@ -32,6 +33,19 @@ begin
   Check(Abs(P.Percent - 100.0) < 0.01, 'progress percent without optional fields');
   Check(P.Speed = '', 'progress speed without optional fields');
   Check(P.Eta = '', 'progress eta without optional fields');
+  Folder := TPath.Combine(TPath.GetTempPath, 'Tube2MP3Tests-' +
+    TGUID.NewGuid.ToString);
+  TDirectory.CreateDirectory(Folder);
+  try
+    ActualPath := TPath.Combine(Folder, 'ELE VEM' + Char($2503) +
+      'JEFFERSON.mp3');
+    StoredPath := TPath.Combine(Folder, 'ELE VEM?JEFFERSON.mp3');
+    TFile.WriteAllText(ActualPath, 'test');
+    Check(ResolveExistingAudioFile(StoredPath) = ActualPath,
+      'resolve historical audio path with replaced character');
+  finally
+    TDirectory.Delete(Folder, True);
+  end;
 end;
 
 begin
