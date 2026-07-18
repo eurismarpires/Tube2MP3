@@ -540,6 +540,8 @@ begin
       L.SubItems.Add(H.Status);
       L.SubItems.Add(H.FilePath);
       L.SubItems.Add(H.Url);
+      L.SubItems.Add(H.Channel);
+      L.SubItems.Add(IntToStr(H.Duration));
     end;
   finally
     lvHistory.Items.EndUpdate;
@@ -574,6 +576,15 @@ begin
   SetPlaybackFile(Path);
   if Item.SubItems.Count > 4 then
     LoadHistoryThumbnail(FPlaybackFile, Item.SubItems[4]);
+  lblTitle.Caption := Item.Caption;
+  if Item.SubItems.Count > 5 then
+    lblChannel.Caption := Item.SubItems[5]
+  else
+    lblChannel.Caption := '-';
+  if Item.SubItems.Count > 6 then
+    lblDuration.Caption := FormatDuration(StrToIntDef(Item.SubItems[6], 0))
+  else
+    lblDuration.Caption := '-';
 end;
 
 procedure TMainForm.btnPlayClick(Sender: TObject);
