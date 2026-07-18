@@ -26,7 +26,8 @@ begin
     Host := LowerCase(Uri.Host);
     Result := ((Uri.Scheme = 'http') or (Uri.Scheme = 'https')) and
       ((Host = 'youtube.com') or (Host = 'www.youtube.com') or
-       (Host = 'm.youtube.com') or (Host = 'youtu.be'));
+       (Host = 'm.youtube.com') or (Host = 'music.youtube.com') or
+       (Host = 'youtu.be'));
   except
     Result := False;
   end;

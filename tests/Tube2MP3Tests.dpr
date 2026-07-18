@@ -24,6 +24,7 @@ var
 begin
   Check(IsSupportedYouTubeUrl('https://www.youtube.com/watch?v=abc123'), 'youtube URL');
   Check(IsSupportedYouTubeUrl('https://youtu.be/abc123'), 'youtu.be URL');
+  Check(IsSupportedYouTubeUrl('https://music.youtube.com/watch?v=E8x4FezoDfE&si=AKE7oabTNffusbQ2'), 'youtube music URL');
   Check(not IsSupportedYouTubeUrl('https://example.com/watch?v=abc123'), 'foreign host');
   Check(not IsSupportedYouTubeUrl('not a URL'), 'invalid URL');
   Check(FormatDuration(0) = '00:00', 'zero duration');

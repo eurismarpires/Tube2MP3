@@ -13,6 +13,12 @@ uses
   Tube2MP3.Infrastructure.YtDlp;
 
 type
+  TQueuedDownload = record
+    Url, Folder, Status: string;
+    Bitrate: Integer;
+    Video: TVideoInfo;
+  end;
+
   TMainForm = class(TForm)
     pnlTop: TPanel;
     lblUrl: TLabel;
@@ -47,6 +53,7 @@ type
     mediaPlayer: TMediaPlayer;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormResize(Sender: TObject);
     procedure btnPasteClick(Sender: TObject);
     procedure btnAnalyzeClick(Sender: TObject);
     procedure btnFolderClick(Sender: TObject);
@@ -68,6 +75,9 @@ type
     FWorker: TThread;
     FVideo: TVideoInfo;
     FPlaybackFile: string;
+    FQueue: TList<TQueuedDownload>;
+    FQueueView: TListView;
+    FQueueRunning: Boolean;
     procedure SetBusy(ABusy: Boolean; const AStatus: string);
     procedure LoadHistory;
     procedure LoadThumbnail(const AUrl: string);
@@ -82,6 +92,13 @@ type
     procedure SetPlaybackFile(const AFilePath: string);
     procedure UpdatePlaybackControls;
     procedure StopPlayback;
+    procedure RefreshQueue;
+    procedure EnqueueDownload(const AUrl, AFolder: string; ABitrate: Integer;
+      const AVideo: TVideoInfo);
+    procedure StartNextQueuedDownload;
+    procedure UpdateQueueItemStatus(AIndex: Integer; const AStatus: string);
+    procedure FinishQueuedDownload(AIndex: Integer; const AStatus: string);
+    procedure LayoutMainControls;
   public
   end;
 
@@ -101,6 +118,18 @@ begin
   Caption := 'Tube2MP3';
   FBasePath := FindProjectBase;
   FLogger := TFileLogger.Create(TPath.Combine(FBasePath, 'logs\application.log'));
+  FQueue := TList<TQueuedDownload>.Create;
+  FQueueView := TListView.Create(Self);
+  FQueueView.Parent := pnlTop;
+  FQueueView.SetBounds(20, 522, 910, 74);
+  FQueueView.Anchors := [akLeft, akTop, akRight];
+  FQueueView.ViewStyle := vsReport;
+  FQueueView.ReadOnly := True;
+  FQueueView.RowSelect := True;
+  FQueueView.Columns.Add.Caption := 'Fila de downloads';
+  FQueueView.Columns[0].Width := 650;
+  FQueueView.Columns.Add.Caption := 'Status';
+  FQueueView.Columns[1].Width := 180;
   FSettings := TAppSettings.Create(TPath.Combine(FBasePath, 'settings.json'));
   try
     FSettings.Load;
@@ -127,7 +156,47 @@ begin
     end;
   end;
   UpdatePlaybackControls;
+  LayoutMainControls;
   SetBusy(False, 'Pronto');
+end;
+
+procedure TMainForm.FormResize(Sender: TObject);
+begin
+  LayoutMainControls;
+end;
+
+procedure TMainForm.LayoutMainControls;
+var
+  ContentWidth, HistoryTop, HistoryBottom: Integer;
+begin
+  ContentWidth := pnlTop.ClientWidth - 40;
+  if ContentWidth < 520 then
+    ContentWidth := 520;
+
+  edtUrl.Width := ContentWidth - 194;
+  btnPaste.Left := edtUrl.Left + edtUrl.Width + 8;
+  btnAnalyze.Left := btnPaste.Left + btnPaste.Width + 8;
+  lblTitle.Width := ContentWidth - 300;
+  edtFolder.Width := ContentWidth - 98;
+  btnFolder.Left := edtFolder.Left + edtFolder.Width + 8;
+  btnOpenFolder.Left := pnlTop.ClientWidth - btnOpenFolder.Width - 30;
+  progressBar.Width := ContentWidth;
+  lblSpeed.Left := pnlTop.ClientWidth - lblSpeed.Width - 30;
+  lblPlayback.Width := btnPlay.Left - lblPlayback.Left - 20;
+
+  FQueueView.SetBounds(20, 522, ContentWidth, 74);
+  FQueueView.Columns[0].Width := ContentWidth - 190;
+  FQueueView.Columns[1].Width := 170;
+
+  lblHistory.Top := FQueueView.Top + FQueueView.Height + 10;
+  lvHistory.Top := lblHistory.Top + 27;
+  lvHistory.Width := ContentWidth;
+  HistoryBottom := pnlTop.ClientHeight - 20;
+  HistoryTop := lvHistory.Top;
+  if HistoryBottom - HistoryTop < 70 then
+    lvHistory.Height := 70
+  else
+    lvHistory.Height := HistoryBottom - HistoryTop;
 end;
 
 function TMainForm.FindProjectBase: string;
@@ -176,6 +245,152 @@ begin
   FYtDlp.Free;
   FSettings.Free;
   FLogger.Free;
+  FQueue.Free;
+end;
+
+procedure TMainForm.RefreshQueue;
+var
+  I: Integer;
+  L: TListItem;
+begin
+  FQueueView.Items.BeginUpdate;
+  try
+    FQueueView.Items.Clear;
+    for I := 0 to FQueue.Count - 1 do
+    begin
+      L := FQueueView.Items.Add;
+      L.Caption := FQueue[I].Video.Title + ' (' + IntToStr(FQueue[I].Bitrate) + ' kbps)';
+      L.SubItems.Add(FQueue[I].Status);
+    end;
+  finally
+    FQueueView.Items.EndUpdate;
+  end;
+end;
+
+procedure TMainForm.UpdateQueueItemStatus(AIndex: Integer; const AStatus: string);
+var
+  Item: TQueuedDownload;
+begin
+  if (AIndex < 0) or (AIndex >= FQueue.Count) then Exit;
+  Item := FQueue[AIndex];
+  Item.Status := AStatus;
+  FQueue[AIndex] := Item;
+  RefreshQueue;
+end;
+
+procedure TMainForm.EnqueueDownload(const AUrl, AFolder: string; ABitrate: Integer;
+  const AVideo: TVideoInfo);
+var
+  Item: TQueuedDownload;
+begin
+  Item.Url := AUrl;
+  Item.Folder := AFolder;
+  Item.Bitrate := ABitrate;
+  Item.Video := AVideo;
+  Item.Status := 'Pendente';
+  FQueue.Add(Item);
+  RefreshQueue;
+  StartNextQueuedDownload;
+end;
+
+procedure TMainForm.FinishQueuedDownload(AIndex: Integer; const AStatus: string);
+begin
+  if Assigned(FWorker) then
+  begin
+    FWorker.WaitFor;
+    FWorker.Free;
+    FWorker := nil;
+  end;
+  UpdateQueueItemStatus(AIndex, AStatus);
+  FQueueRunning := False;
+  SetBusy(False, AStatus);
+  StartNextQueuedDownload;
+end;
+
+procedure TMainForm.StartNextQueuedDownload;
+var
+  I, QueueIndex: Integer;
+  Queued: TQueuedDownload;
+begin
+  if FQueueRunning then Exit;
+  QueueIndex := -1;
+  for I := 0 to FQueue.Count - 1 do
+    if SameText(FQueue[I].Status, 'Pendente') then
+    begin
+      QueueIndex := I;
+      Break;
+    end;
+  if QueueIndex < 0 then
+    Exit;
+
+  Queued := FQueue[QueueIndex];
+  FQueueRunning := True;
+  UpdateQueueItemStatus(QueueIndex, 'Baixando');
+  progressBar.Position := 0;
+  lblSpeed.Caption := '';
+  SetBusy(True, 'Preparando download...');
+  FWorker := TThread.CreateAnonymousThread(
+    procedure
+    var
+      FilePath, ErrorText: string;
+      Item: THistoryItem;
+    begin
+      try
+        FilePath := FYtDlp.DownloadAudio(Queued.Url, Queued.Folder, Queued.Bitrate,
+          procedure(const P: TDownloadProgress)
+          begin
+            TThread.Queue(nil,
+              procedure
+              begin
+                progressBar.Position := Round(P.Percent);
+                lblStatus.Caption := Format('Baixando: %.1f%%', [P.Percent]);
+                lblSpeed.Caption := P.Speed + '  Restante: ' + P.Eta;
+              end);
+          end);
+        Item := Default(THistoryItem);
+        Item.Title := Queued.Video.Title;
+        Item.Url := Queued.Url;
+        Item.Channel := Queued.Video.Channel;
+        Item.Duration := Queued.Video.Duration;
+        Item.Quality := Queued.Bitrate;
+        Item.FilePath := FilePath;
+        Item.Status := 'Concluído';
+        Item.CreatedAt := Now;
+        if FileExists(FilePath) then Item.Size := GetLocalFileSize(FilePath);
+        TThread.Queue(nil,
+          procedure
+          begin
+            if Assigned(FHistory) then FHistory.Add(Item);
+            progressBar.Position := 100;
+            LoadHistory;
+            SetPlaybackFile(FilePath);
+            SaveThumbnail(Queued.Video.ThumbnailUrl, FilePath);
+            FinishQueuedDownload(QueueIndex, 'Concluido');
+          end);
+      except
+        on E: EAbort do
+        begin
+          TThread.Queue(nil,
+            procedure
+            begin
+              FinishQueuedDownload(QueueIndex, 'Cancelado');
+            end);
+        end;
+        on E: Exception do
+        begin
+          ErrorText := E.Message;
+          FLogger.Error('Download: ' + ErrorText);
+          TThread.Queue(nil,
+            procedure
+            begin
+              MessageDlg(ErrorText, mtError, [mbOK], 0);
+              FinishQueuedDownload(QueueIndex, 'Falhou');
+            end);
+        end;
+      end;
+    end);
+  FWorker.FreeOnTerminate := False;
+  FWorker.Start;
 end;
 
 procedure TMainForm.UpdatePlaybackControls;
@@ -379,7 +594,7 @@ begin
       try
         Client.Get(AUrl, Stream);
         CachePath := ThumbnailCachePath(AAudioPath);
-        ForceDirectories(ExtractFileDir(CachePath));
+        System.SysUtils.ForceDirectories(ExtractFileDir(CachePath));
         Stream.SaveToFile(CachePath);
         TThread.Queue(nil,
           procedure
@@ -445,72 +660,7 @@ begin
     MessageDlg('Escolha a pasta de destino.', mtWarning, [mbOK], 0);
     Exit;
   end;
-  StopWorker;
-  progressBar.Position := 0;
-  lblSpeed.Caption := '';
-  SetBusy(True, 'Preparando download...');
-  FWorker := TThread.CreateAnonymousThread(
-    procedure
-    var
-      FilePath, ErrorText: string;
-      Item: THistoryItem;
-    begin
-      try
-        FilePath := FYtDlp.DownloadAudio(Url, Folder, Bitrate,
-          procedure(const P: TDownloadProgress)
-          begin
-            TThread.Queue(nil,
-              procedure
-              begin
-                progressBar.Position := Round(P.Percent);
-                lblStatus.Caption := Format('Baixando: %.1f%%', [P.Percent]);
-                lblSpeed.Caption := P.Speed + '  Restante: ' + P.Eta;
-              end);
-          end);
-        Item := Default(THistoryItem);
-        Item.Title := Video.Title;
-        Item.Url := Url;
-        Item.Channel := Video.Channel;
-        Item.Duration := Video.Duration;
-        Item.Quality := Bitrate;
-        Item.FilePath := FilePath;
-        Item.Status := 'Concluído';
-        Item.CreatedAt := Now;
-        if FileExists(FilePath) then Item.Size := GetLocalFileSize(FilePath);
-        TThread.Queue(nil,
-          procedure
-          begin
-            if Assigned(FHistory) then FHistory.Add(Item);
-            progressBar.Position := 100;
-            SetBusy(False, 'Download concluído');
-            LoadHistory;
-            SetPlaybackFile(FilePath);
-            SaveThumbnail(Video.ThumbnailUrl, FilePath);
-          end);
-      except
-        on E: EAbort do
-        begin
-          TThread.Queue(nil,
-            procedure
-            begin
-              SetBusy(False, 'Download cancelado');
-            end);
-        end;
-        on E: Exception do
-        begin
-          ErrorText := E.Message;
-          FLogger.Error('Download: ' + ErrorText);
-          TThread.Queue(nil,
-            procedure
-            begin
-              SetBusy(False, 'Falha no download');
-              MessageDlg(ErrorText, mtError, [mbOK], 0);
-            end);
-        end;
-      end;
-    end);
-  FWorker.FreeOnTerminate := False;
-  FWorker.Start;
+  EnqueueDownload(Url, Folder, Bitrate, Video);
 end;
 
 procedure TMainForm.btnCancelClick(Sender: TObject);

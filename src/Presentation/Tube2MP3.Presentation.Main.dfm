@@ -12,9 +12,12 @@
   Font.Height = -13
   Font.Name = 'Segoe UI'
   Font.Style = []
+  OldCreateOrder = True
   Position = poScreenCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnResize = FormResize
+  PixelsPerInch = 96
   TextHeight = 17
   object pnlTop: TPanel
     Left = 0
@@ -28,13 +31,19 @@
     Padding.Right = 20
     Padding.Bottom = 16
     TabOrder = 0
+    DesignSize = (
+      960
+      700)
     object lblUrl: TLabel
       Left = 20
       Top = 16
-      Width = 166
+      Width = 190
       Height = 21
       Caption = 'Cole um link do YouTube'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
       Font.Height = -16
+      Font.Name = 'Segoe UI'
       Font.Style = [fsBold]
       ParentFont = False
     end
@@ -50,9 +59,13 @@
     object lblTitleCaption: TLabel
       Left = 320
       Top = 94
-      Width = 35
+      Width = 37
       Height = 17
-      Caption = 'Título'
+      Caption = 'T'#237'tulo'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
       Font.Style = [fsBold]
       ParentFont = False
     end
@@ -68,46 +81,54 @@
     object lblChannelCaption: TLabel
       Left = 320
       Top = 168
-      Width = 35
+      Width = 34
       Height = 17
       Caption = 'Canal'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
       Font.Style = [fsBold]
       ParentFont = False
     end
     object lblChannel: TLabel
       Left = 320
       Top = 190
-      Width = 9
+      Width = 5
       Height = 17
       Caption = '-'
     end
     object lblDurationCaption: TLabel
       Left = 320
       Top = 218
-      Width = 50
+      Width = 51
       Height = 17
-      Caption = 'Duração'
+      Caption = 'Dura'#231#227'o'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
       Font.Style = [fsBold]
       ParentFont = False
     end
     object lblDuration: TLabel
       Left = 382
       Top = 218
-      Width = 9
+      Width = 5
       Height = 17
       Caption = '-'
     end
     object lblFolderCaption: TLabel
       Left = 20
       Top = 270
-      Width = 96
+      Width = 97
       Height = 17
       Caption = 'Pasta de destino'
     end
     object lblQuality: TLabel
       Left = 20
       Top = 326
-      Width = 59
+      Width = 60
       Height = 17
       Caption = 'Qualidade'
     end
@@ -128,19 +149,26 @@
     object lblHistory: TLabel
       Left = 20
       Top = 538
-      Width = 58
+      Width = 69
       Height = 21
-      Caption = 'Histórico'
+      Caption = 'Hist'#243'rico'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
       Font.Height = -16
+      Font.Name = 'Segoe UI'
       Font.Style = [fsBold]
       ParentFont = False
     end
     object lblPlaybackCaption: TLabel
       Left = 20
       Top = 454
-      Width = 76
+      Width = 73
       Height = 17
       Caption = 'Reproducao'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
       Font.Style = [fsBold]
       ParentFont = False
     end
@@ -246,7 +274,7 @@
       Anchors = [akLeft, akTop, akRight, akBottom]
       Columns = <
         item
-          Caption = 'Título'
+          Caption = 'T'#237'tulo'
           Width = 400
         end
         item
@@ -267,7 +295,7 @@
         end>
       ReadOnly = True
       RowSelect = True
-      TabOrder = 10
+      TabOrder = 13
       ViewStyle = vsReport
       OnDblClick = lvHistoryDblClick
       OnSelectItem = lvHistorySelectItem
@@ -302,10 +330,13 @@
     object mediaPlayer: TMediaPlayer
       Left = 842
       Top = 474
-      Width = 85
+      Width = 29
       Height = 29
       VisibleButtons = []
+      DoubleBuffered = True
       Visible = False
+      ParentDoubleBuffered = False
+      TabOrder = 14
     end
   end
 end

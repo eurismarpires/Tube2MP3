@@ -63,4 +63,41 @@ foreach ($member in $requiredPlaybackMembers) {
     }
 }
 
+$requiredQueueMembers = @(
+    'FQueue: TList<TQueuedDownload>',
+    'FQueueView: TListView',
+    'FQueueRunning: Boolean',
+    'procedure RefreshQueue',
+    'procedure EnqueueDownload(const AUrl, AFolder: string; ABitrate: Integer;',
+    'procedure StartNextQueuedDownload',
+    'procedure UpdateQueueItemStatus(AIndex: Integer; const AStatus: string)',
+    'procedure FinishQueuedDownload(AIndex: Integer; const AStatus: string)',
+    'EnqueueDownload(Url, Folder, Bitrate, Video)',
+    'StartNextQueuedDownload',
+    'FinishQueuedDownload(QueueIndex, ''Concluido'')',
+    'FinishQueuedDownload(QueueIndex, ''Falhou'')',
+    'FinishQueuedDownload(QueueIndex, ''Cancelado'')'
+)
+foreach ($member in $requiredQueueMembers) {
+    if ($mainFormText -notlike "*$member*") {
+        throw "Fila de downloads incompleta: declaracao ausente '$member'."
+    }
+}
+
+$requiredResponsiveMembers = @(
+    'procedure FormResize(Sender: TObject)',
+    'procedure LayoutMainControls',
+    'OnResize = FormResize',
+    'LayoutMainControls;'
+)
+foreach ($member in $requiredResponsiveMembers) {
+    if (($mainFormText + (Get-Content -Raw (Join-Path $PSScriptRoot '..\src\Presentation\Tube2MP3.Presentation.Main.dfm'))) -notlike "*$member*") {
+        throw "Layout responsivo incompleto: declaracao ausente '$member'."
+    }
+}
+
+if ($mainFormText -like '*ClientHeight := 880*') {
+    throw 'Layout alto demais: nao force ClientHeight 880 em tempo de execucao.'
+}
+
 Write-Host 'PROJECT VALIDATION PASSED'
