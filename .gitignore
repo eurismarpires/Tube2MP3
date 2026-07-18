@@ -1,0 +1,13 @@
+build/
+work/
+data/
+logs/
+downloads/
+settings.json
+Tube2MP3.exe
+bin/*.exe
+ffmpeg-*/
+*.7z
+*.dcu
+*.local
+*.identcache
