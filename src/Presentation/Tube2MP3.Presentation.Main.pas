@@ -556,14 +556,10 @@ begin
 end;
 
 procedure TMainForm.lvHistoryDblClick(Sender: TObject);
-var
-  Path: string;
 begin
   if lvHistory.Selected = nil then Exit;
-  Path := lvHistory.Selected.SubItems[3];
-  if FileExists(Path) then
-    ShellExecute(Handle, 'open', PChar('/select,"' + Path + '"'), nil, nil,
-      SW_SHOWNORMAL);
+  lvHistorySelectItem(lvHistory, lvHistory.Selected, True);
+  btnPlayClick(btnPlay);
 end;
 
 procedure TMainForm.lvHistorySelectItem(Sender: TObject; Item: TListItem;
