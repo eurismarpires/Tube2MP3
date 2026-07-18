@@ -573,7 +573,7 @@ begin
   Path := Item.SubItems[3];
   SetPlaybackFile(Path);
   if Item.SubItems.Count > 4 then
-    LoadHistoryThumbnail(Path, Item.SubItems[4]);
+    LoadHistoryThumbnail(FPlaybackFile, Item.SubItems[4]);
 end;
 
 procedure TMainForm.btnPlayClick(Sender: TObject);
